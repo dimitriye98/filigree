@@ -1,8 +1,12 @@
 package com.dimitriye.filigree
 
+import com.squareup.moshi.JsonAdapter
+import com.squareup.moshi.Types
 import net.fabricmc.lorenztiny.TinyMappingsJoiner
 import net.fabricmc.mapping.tree.TinyMappingFactory
 import net.fabricmc.mapping.tree.TinyTree
+import okio.buffer
+import okio.source
 import org.cadixdev.lorenz.MappingSet
 import java.io.BufferedInputStream
 import java.io.BufferedReader
@@ -10,6 +14,25 @@ import java.io.InputStreamReader
 import java.lang.IllegalArgumentException
 import java.net.URL
 import java.util.zip.ZipInputStream
+
+private val yarnManifestURL = URL("https://maven.modmuss50.me/net/fabricmc/yarn/versions.json")
+
+private val yarnManifestAdapter: JsonAdapter<Map<String, List<String>>> = Types.newParameterizedType(
+	Map::class.java,
+	String::class.java,
+	Types.newParameterizedType(List::class.java, String::class.java)
+).let(moshi::adapter)
+
+private val yarnManifest: Map<String, List<String>> by lazy {
+	yarnManifestURL.openStream().use {
+		it.source().buffer().let(yarnManifestAdapter::fromJson) !!
+	}
+}
+
+fun latestYarnBuild(version: String): String {
+	return yarnManifest[version]?.last()
+		?: throw NoSuchElementException("No yarn builds for Minecraft version $version")
+}
 
 fun yarnURL(minecraftVersion: String, yarnBuild: String): URL {
 	return URL(

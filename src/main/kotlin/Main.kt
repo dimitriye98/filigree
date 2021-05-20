@@ -1,11 +1,23 @@
 package com.dimitriye.filigree
 
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
+import org.apache.commons.cli.DefaultParser
+import org.apache.commons.cli.HelpFormatter
+import org.apache.commons.cli.Option
+import org.apache.commons.cli.Options
 import org.cadixdev.mercury.Mercury
 import org.cadixdev.mercury.remapper.MercuryRemapper
 
 import java.io.File
 import java.nio.file.Path
 import kotlin.collections.ArrayList
+
+val moshi by lazy {
+	Moshi.Builder()
+		.addLast(KotlinJsonAdapterFactory())
+		.build()
+}
 
 fun readClassPathFromFile(file: File): List<Path> {
 	val out = ArrayList<Path>()
@@ -16,29 +28,100 @@ fun readClassPathFromFile(file: File): List<Path> {
 }
 
 fun main(args: Array<String>) {
-	val argsSlice: List<String>
-	val version: String
-	if (args[0] == "-v") {
-		version = args[1]
-		argsSlice = args.slice(2..args.size)
-	} else {
-		version = "1.16.5"
-		argsSlice = args.asList()
+	val options = Options()
+
+	Option.builder("m")
+		.hasArg()
+		.longOpt("mc-version")
+		.desc("the minecraft version to map against, defaults to latest release")
+		.build()
+		.let( options::addOption )
+
+	Option.builder("y")
+		.hasArg()
+		.longOpt("yarn-build")
+		.desc("the build of yarn to remap to, defaults to latest")
+		.build()
+		.let( options::addOption )
+
+	Option.builder("o")
+		.hasArg()
+		.longOpt("output-dir")
+		.desc("the output directory, defaults to [SOURCE_DIRECTORY]_remapped")
+		.type(File::class.java)
+		.build()
+		.let( options::addOption )
+
+	Option.builder("c")
+		.hasArg()
+		.longOpt("classpath")
+		.desc("adds a classpath")
+		.type(File::class.java)
+		.build()
+		.let( options::addOption )
+
+	Option.builder("C")
+		.hasArg()
+		.longOpt("classpaths")
+		.desc("imports a list of classpaths from a file")
+		.type(File::class.java)
+		.build()
+		.let( options::addOption )
+
+	Option.builder("f")
+		.longOpt("force")
+		.desc("force remap even if output path already exists")
+		.build()
+		.let( options::addOption )
+
+	Option.builder("h")
+		.longOpt("help")
+		.desc("display this message")
+		.build()
+		.let( options::addOption )
+
+	val cli = DefaultParser().parse(options, args, true)
+	if (cli.hasOption("help") || cli.args.size != 1) {
+		val help = HelpFormatter()
+		help.printHelp("filigree [OPTION]... [SOURCE_DIRECTORY]", options)
+		return
 	}
 
-	val moj = fetchAndCompileMojangMappings(version) // MOJ->OBF
-//	val mcp = fetchMCPMappings("1.16.5").reverse() // MCP->OBF
-//	val mcpMerged = moj.merge(mcp)
+	val version = cli.getOptionValue("version") ?: latestVersions.release
+	val yarnBuild = cli.getOptionValue("yarn-build") ?: latestYarnBuild(version)
 
-	val yarn = fetchAndCompileYarnMappings(version, "9") // OBF->YARN
-	val mojToYarn = moj.merge(yarn)
+	val inputPath = Path.of(cli.args[0])
+	val outputPath = cli.getOptionValue("output-dir")?.let(Path::of)
+		?: (inputPath.parent ?: Path.of("")).resolve(inputPath.fileName.toString() + "_remapped")
+
+	if (!cli.hasOption("force") && outputPath.toFile().exists()) {
+		val outputPathErr = cli.getOptionValue("output-dir")
+			?: Path.of("").toAbsolutePath().relativize(outputPath)
+		System.err.println("$outputPathErr already exists, if this is intentional, run again with -f")
+		System.exit(1)
+	}
+
+	val classPaths = ArrayList<Path>()
+
+	cli.getOptionValues("classpath")
+		?.map(Path::of)
+		?.let(classPaths::addAll)
+
+	cli.getOptionValues("classpaths")
+		?.map(::File)
+		?.flatMap(::readClassPathFromFile)
+		?.let(classPaths::addAll)
+
+	val moj = fetchAndCompileMojangMappings(version) // MOJ->OBF
+
+	val yarn = fetchAndCompileYarnMappings(version, yarnBuild) // OBF->YARN
+	val mojToYarn = moj.merge(yarn) // MOJ->YARN
 
 	val mercury = Mercury()
 
-	readClassPathFromFile(File("classpath.txt"))
-		.let(mercury.classPath::addAll)
+	mercury.classPath.addAll(classPaths)
 
 	mercury.processors.add(MercuryRemapper.create(mojToYarn))
 
-	mercury.rewrite(Path.of(args[0]), Path.of(args[1]))
+	mercury.rewrite(inputPath, outputPath)
 }

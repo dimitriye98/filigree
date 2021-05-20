@@ -1,8 +1,5 @@
 package com.dimitriye.filigree
 
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
-
 import okio.buffer
 import okio.source
 
@@ -13,26 +10,27 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.URL
 
+data class Latest(val release: String, val snapshot: String)
 data class Version(val id: String, val url: String)
-data class Manifest(val versions: List<Version>)
+data class Manifest(val latest: Latest, val versions: List<Version>)
 data class Download(val url: String)
 data class Downloads(val client_mappings: Download, val server_mappings: Download)
 data class ManifestEntry(val downloads: Downloads)
 
 val manifestURL = URL("https://launchermeta.mojang.com/mc/game/version_manifest_v2.json")
 
-fun scrapeMojangManifest(version: String): Downloads {
-	val moshi = Moshi.Builder()
-		.addLast(KotlinJsonAdapterFactory())
-		.build()
+private val manifestAdapter by lazy { moshi.adapter(Manifest::class.java) }
+private val manifestEntryAdapter by lazy { moshi.adapter(ManifestEntry::class.java) }
 
-	val manifestAdapter = moshi.adapter(Manifest::class.java)
-	val manifestEntryAdapter = moshi.adapter(ManifestEntry::class.java)
-
-	val manifest = manifestURL.openStream().use {
+private val manifest by lazy {
+	manifestURL.openStream().use {
 		it.source().buffer().let(manifestAdapter::fromJson) !!
 	}
+}
 
+val latestVersions by lazy { manifest.latest }
+
+fun scrapeMojangManifest(version: String): Downloads {
 	val versionEntry = manifest.versions
 		.parallelStream()
 		.filter{ it.id == version }
