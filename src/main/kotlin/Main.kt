@@ -112,16 +112,22 @@ fun main(args: Array<String>) {
 		?.flatMap(::readClassPathFromFile)
 		?.let(classPaths::addAll)
 
+	// Forge does a weird thing when using official Mojang mappings
+	// where official mappings are used for fields and methods
+	// but MCP mappings are used for class names
+	// The solution to this is kinda fugly but works:
+	// We proceed as follows:
+	// MCP->OBF->MOJ->OBF->YARN
+	val mcp = fetchMCPMappings(version).reverse() // MCP->OBF
 	val moj = fetchAndCompileMojangMappings(version) // MOJ->OBF
-
 	val yarn = fetchAndCompileYarnMappings(version, yarnBuild) // OBF->YARN
-	val mojToYarn = moj.merge(yarn) // MOJ->YARN
+	val chain = mcp.merge(moj.reverse()).merge(moj).merge(yarn)
 
 	val mercury = Mercury()
 
 	mercury.classPath.addAll(classPaths)
 
-	mercury.processors.add(MercuryRemapper.create(mojToYarn))
+	mercury.processors.add(MercuryRemapper.create(chain))
 
 	mercury.rewrite(inputPath, outputPath)
 }
