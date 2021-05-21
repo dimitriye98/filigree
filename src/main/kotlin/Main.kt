@@ -1,33 +1,78 @@
 package com.dimitriye.filigree
 
-import com.squareup.moshi.Moshi
-import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import org.apache.commons.cli.DefaultParser
 import org.apache.commons.cli.HelpFormatter
 import org.apache.commons.cli.Option
 import org.apache.commons.cli.Options
 import org.cadixdev.mercury.Mercury
 import org.cadixdev.mercury.remapper.MercuryRemapper
-
 import java.io.File
 import java.nio.file.Path
-import kotlin.collections.ArrayList
-
-val moshi by lazy {
-	Moshi.Builder()
-		.addLast(KotlinJsonAdapterFactory())
-		.build()
-}
-
-fun readClassPathFromFile(file: File): List<Path> {
-	val out = ArrayList<Path>()
-	file.forEachLine {
-		out.add(Path.of(it))
-	}
-	return out
-}
+import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
+	val options = buildOptions()
+
+	// Display help message if called improperly
+	val cli = DefaultParser().parse(options, args, true)
+	if (cli.hasOption("help") || cli.args.size != 1) {
+		val help = HelpFormatter()
+		help.printHelp("filigree [OPTION]... [SOURCE_DIRECTORY]", options)
+		return
+	}
+
+	// Read all options and incorporate sensible defaults
+	val version = cli.getOptionValue("version")
+		?: latestVersions.release
+	val yarnBuild = cli.getOptionValue("yarn-build")
+		?: latestYarnBuild(version)
+
+	// Input path is sole non-option based argument
+	val inputPath = Path.of(cli.args[0])
+	val outputPath = cli.getOptionValue("output-dir")?.let(Path::of)
+		?: inputPath.toAbsolutePath().parent.resolve(inputPath.fileName.toString() + "_remapped")
+
+	// Don't overwrite unless called with -f
+	if (!cli.hasOption("force") && outputPath.toFile().exists()) {
+		val outputPathErr = cli.getOptionValue("output-dir")
+			?: Path.of("").toAbsolutePath().relativize(outputPath.toAbsolutePath())
+
+		System.err.println("$outputPathErr already exists, if this is intentional, run again with -f")
+		exitProcess(1)
+	}
+
+	// Incorporate classpaths
+	val classPaths = ArrayList<Path>()
+
+	cli.getOptionValues("classpath")
+		?.map(Path::of)
+		?.let(classPaths::addAll)
+
+	cli.getOptionValues("classpaths")
+		?.map(::File)
+		?.flatMap(::readClassPathFromFile)
+		?.let(classPaths::addAll)
+
+	// Forge does a weird thing when using official Mojang mappings
+	// where official mappings are used for fields and methods
+	// but MCP mappings are used for class names
+	// The solution to this is kinda fugly but works:
+	// We proceed as follows:
+	// MCP->OBF->MOJ->OBF->YARN
+	val mcp = fetchMCPMappings(version).reverse() // MCP->OBF
+	val moj = fetchAndCompileMojangMappings(version) // MOJ->OBF
+	val yarn = fetchAndCompileYarnMappings(version, yarnBuild) // OBF->YARN
+
+	val chain = mcp.merge(moj.reverse()).merge(moj).merge(yarn)
+
+	// Call mercury to do the heavy lifting
+	val mercury = Mercury()
+	mercury.classPath.addAll(classPaths)
+	mercury.processors.add(MercuryRemapper.create(chain))
+	mercury.rewrite(inputPath, outputPath)
+}
+
+fun buildOptions(): Options {
 	val options = Options()
 
 	Option.builder("m")
@@ -80,54 +125,5 @@ fun main(args: Array<String>) {
 		.build()
 		.let( options::addOption )
 
-	val cli = DefaultParser().parse(options, args, true)
-	if (cli.hasOption("help") || cli.args.size != 1) {
-		val help = HelpFormatter()
-		help.printHelp("filigree [OPTION]... [SOURCE_DIRECTORY]", options)
-		return
-	}
-
-	val version = cli.getOptionValue("version") ?: latestVersions.release
-	val yarnBuild = cli.getOptionValue("yarn-build") ?: latestYarnBuild(version)
-
-	val inputPath = Path.of(cli.args[0])
-	val outputPath = cli.getOptionValue("output-dir")?.let(Path::of)
-		?: (inputPath.parent ?: Path.of("")).resolve(inputPath.fileName.toString() + "_remapped")
-
-	if (!cli.hasOption("force") && outputPath.toFile().exists()) {
-		val outputPathErr = cli.getOptionValue("output-dir")
-			?: Path.of("").toAbsolutePath().relativize(outputPath)
-		System.err.println("$outputPathErr already exists, if this is intentional, run again with -f")
-		System.exit(1)
-	}
-
-	val classPaths = ArrayList<Path>()
-
-	cli.getOptionValues("classpath")
-		?.map(Path::of)
-		?.let(classPaths::addAll)
-
-	cli.getOptionValues("classpaths")
-		?.map(::File)
-		?.flatMap(::readClassPathFromFile)
-		?.let(classPaths::addAll)
-
-	// Forge does a weird thing when using official Mojang mappings
-	// where official mappings are used for fields and methods
-	// but MCP mappings are used for class names
-	// The solution to this is kinda fugly but works:
-	// We proceed as follows:
-	// MCP->OBF->MOJ->OBF->YARN
-	val mcp = fetchMCPMappings(version).reverse() // MCP->OBF
-	val moj = fetchAndCompileMojangMappings(version) // MOJ->OBF
-	val yarn = fetchAndCompileYarnMappings(version, yarnBuild) // OBF->YARN
-	val chain = mcp.merge(moj.reverse()).merge(moj).merge(yarn)
-
-	val mercury = Mercury()
-
-	mercury.classPath.addAll(classPaths)
-
-	mercury.processors.add(MercuryRemapper.create(chain))
-
-	mercury.rewrite(inputPath, outputPath)
+	return options
 }

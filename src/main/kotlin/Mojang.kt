@@ -10,14 +10,14 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.URL
 
-data class Latest(val release: String, val snapshot: String)
-data class Version(val id: String, val url: String)
-data class Manifest(val latest: Latest, val versions: List<Version>)
-data class Download(val url: String)
-data class Downloads(val client_mappings: Download, val server_mappings: Download)
-data class ManifestEntry(val downloads: Downloads)
+data class LatestMinecraftVersions(val release: String, val snapshot: String)
+private data class Version(val id: String, val url: String)
+private data class Manifest(val latest: LatestMinecraftVersions, val versions: List<Version>)
+private data class Download(val url: String)
+private data class Downloads(val client_mappings: Download, val server_mappings: Download)
+private data class ManifestEntry(val downloads: Downloads)
 
-val manifestURL = URL("https://launchermeta.mojang.com/mc/game/version_manifest_v2.json")
+private val manifestURL = URL("https://launchermeta.mojang.com/mc/game/version_manifest_v2.json")
 
 private val manifestAdapter by lazy { moshi.adapter(Manifest::class.java) }
 private val manifestEntryAdapter by lazy { moshi.adapter(ManifestEntry::class.java) }
@@ -30,34 +30,34 @@ private val manifest by lazy {
 
 val latestVersions by lazy { manifest.latest }
 
-fun scrapeMojangManifest(version: String): Downloads {
+/**
+ * Finds the mapping downloads for a given version of minecraft
+ */
+private fun scrapeMojangManifest(version: String): Downloads {
 	val versionEntry = manifest.versions
 		.parallelStream()
-		.filter{ it.id == version }
+		.filter { it.id == version }
 		.findFirst()
-		.orElse(null)
+		.orElse(null) // Unwrap Java optional to nullable
 		?.url
 		?.let(::URL)
 
 		?: throw IllegalArgumentException("Manifest contains no such version $version")
 
-	val downloads = versionEntry.openStream()
+	return versionEntry.openStream()
 		.use {
-			it.source().buffer().let(manifestEntryAdapter::fromJson) !!
+			it.source()
+				.buffer()
+				.let(manifestEntryAdapter::fromJson)!!
 		}
 		.downloads
-
-	return downloads
 }
 
-fun readProGuardFromURL(url: URL): MappingSet {
-	return url.openStream().use {
-		InputStreamReader(it).use {
-			BufferedReader(it).use {
-				ProGuardReader(it).read()
-			}
-		}
-	}
+private fun readProGuardFromURL(url: URL): MappingSet {
+	return url.openStream()
+		.let { InputStreamReader(it) }
+		.let { BufferedReader(it) }
+		.use { ProGuardReader(it).read() }
 }
 
 fun fetchAndCompileMojangMappings(version: String): MappingSet {
