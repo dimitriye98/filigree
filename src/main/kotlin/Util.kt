@@ -16,9 +16,9 @@ val moshi by lazy {
 }
 
 fun streamFileFromZippedURL(url: URL, path: String): InputStream {
-	url.openStream().use {
-		BufferedInputStream(it).use {
-			ZipInputStream(it).use {
+	url.openStream().let {
+		BufferedInputStream(it).let {
+			ZipInputStream(it).let {
 				var entry = it.nextEntry
 				while (entry != null) {
 					if (entry.name == path) {
