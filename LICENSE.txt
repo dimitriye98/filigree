@@ -19,3 +19,10 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+This project contains code heavily derivative of code by
+Cadix Development (https://www.cadixdev.org). Such code is clearly marked in
+the file headers. Due to licensing restrictions, components marked as such are
+not available under the MIT license as above, but rather under the EPL 2.0. All
+changes by this project to said code are clearly marked and available either
+under the EPL 2.0 or the MIT license.
