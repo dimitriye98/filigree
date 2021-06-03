@@ -58,12 +58,13 @@ fun main(args: Array<String>) {
 	// but MCP mappings are used for class names
 	// The solution to this is kinda fugly but works:
 	// We proceed as follows:
-	// MCP->OBF->MOJ->OBF->YARN
+	// MCP-OBF->MOJ restricted only to class names
+	// followed by MOJ->OBF->YARN
 	val mcp = fetchMCPMappings(version).reverse() // MCP->OBF
 	val moj = fetchAndCompileMojangMappings(version) // MOJ->OBF
 	val yarn = fetchAndCompileYarnMappings(version, yarnBuild) // OBF->YARN
 
-	val chain = mcp.merge(moj.reverse()).merge(moj).merge(yarn)
+	val chain = cloneClasses(mcp).merge(cloneClasses(moj).reverse()).merge(moj).merge(yarn)
 
 	// Call mercury to do the heavy lifting
 	val mercury = Mercury()
