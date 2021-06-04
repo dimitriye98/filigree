@@ -1,6 +1,8 @@
 package com.dimitriye.filigree
 
+import com.dimitriye.filigree.model.MappingSetModelFactoryImpl
 import org.cadixdev.lorenz.MappingSet
+import org.cadixdev.lorenz.io.TextMappingsReader
 import org.cadixdev.lorenz.io.srg.tsrg.TSrgReader
 
 import java.io.BufferedReader
@@ -17,5 +19,5 @@ fun fetchMCPMappings(version: String): MappingSet {
 	return streamFileFromZippedURL(mcpURL(version), "config/joined.tsrg")
 		.let { InputStreamReader(it) }
 		.let { BufferedReader(it) }
-		.use { TSrgReader(it).read() }
+		.use { TSrgReader(it).read(MappingSet.create(MappingSetModelFactoryImpl())) }
 }

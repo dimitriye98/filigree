@@ -232,7 +232,7 @@ public abstract class AbstractClassMappingImpl<M extends ClassMapping, P>
 
             for (final MethodMapping mapping : parentMappings.getMethodMappings()) {
                 if (parent.canInherit(info, mapping.getSignature())) {
-                    this.methods.putIfAbsent(mapping.getSignature(), mapping);
+                    this.methods.put(mapping.getSignature(), mapping);
                 }
 
                 // Check if there are any methods here that override the return type of a parent
@@ -249,7 +249,7 @@ public abstract class AbstractClassMappingImpl<M extends ClassMapping, P>
                         if (!Objects.equals(methodDescriptor.getParamTypes(), mappingDescriptor.getParamTypes())) continue;
 
                         if (mappingDescriptor.getReturnType().isAssignableFrom(methodDescriptor.getReturnType(), provider)) {
-                            this.methods.putIfAbsent(methodSignature, mapping);
+                            this.methods.put(methodSignature, mapping);
                         }
                     }
                 }

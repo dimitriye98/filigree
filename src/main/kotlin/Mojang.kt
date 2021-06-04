@@ -1,5 +1,6 @@
 package com.dimitriye.filigree
 
+import com.dimitriye.filigree.model.MappingSetModelFactoryImpl
 import okio.buffer
 import okio.source
 
@@ -57,7 +58,7 @@ private fun readProGuardFromURL(url: URL): MappingSet {
 	return url.openStream()
 		.let { InputStreamReader(it) }
 		.let { BufferedReader(it) }
-		.use { ProGuardReader(it).read() }
+		.use { ProGuardReader(it).read(MappingSet.create(MappingSetModelFactoryImpl())) }
 }
 
 fun fetchAndCompileMojangMappings(version: String): MappingSet {

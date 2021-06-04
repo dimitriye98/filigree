@@ -1,5 +1,6 @@
 package com.dimitriye.filigree
 
+import com.dimitriye.filigree.model.MappingSetModelFactoryImpl
 import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.Types
 import net.fabricmc.lorenztiny.TinyMappingsJoiner
@@ -66,5 +67,5 @@ fun fetchAndCompileYarnMappings(minecraftVersion: String, yarnBuild: String): Ma
 		intermediary, "official",
 		yarn, "named",
 		"intermediary"
-	).read()
+	).read(MappingSet.create(MappingSetModelFactoryImpl()))
 }

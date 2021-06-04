@@ -16,8 +16,7 @@
 
 package com.dimitriye.filigree.remapper;
 
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.BiFunction;
 import org.cadixdev.bombe.analysis.InheritanceProvider;
 import org.cadixdev.bombe.type.signature.FieldSignature;
@@ -31,12 +30,7 @@ import org.cadixdev.lorenz.model.MethodMapping;
 import org.cadixdev.mercury.RewriteContext;
 import org.cadixdev.mercury.analysis.MercuryInheritanceProvider;
 import org.cadixdev.mercury.util.GracefulCheck;
-import org.eclipse.jdt.core.dom.ASTVisitor;
-import org.eclipse.jdt.core.dom.IBinding;
-import org.eclipse.jdt.core.dom.IMethodBinding;
-import org.eclipse.jdt.core.dom.ITypeBinding;
-import org.eclipse.jdt.core.dom.IVariableBinding;
-import org.eclipse.jdt.core.dom.SimpleName;
+import org.eclipse.jdt.core.dom.*;
 
 import static org.cadixdev.mercury.util.BombeBindings.convertSignature;
 
@@ -61,6 +55,30 @@ class SimpleRemapperVisitor extends ASTVisitor {
 		}
 	}
 
+	/**
+	 * Gathers all superclasses of a type into a collection
+	 *
+	 * @author Dimitriye Danilovic
+	 * @param binding the type whose ancestors to collect
+	 * @param col output collection
+	 * @param ast the AST object
+	 */
+	private void ascendHierarchy(ITypeBinding binding, Collection<ITypeBinding> col, AST ast) {
+		if (Objects.equals(binding, ast.resolveWellKnownType("java.lang.Object"))) {
+			return;
+		}
+
+		if (!binding.isInterface()) {
+			col.add(binding.getSuperclass());
+			ascendHierarchy(binding.getSuperclass(), col, ast);
+		}
+
+		for (ITypeBinding it: binding.getInterfaces()) {
+			col.add(it);
+			ascendHierarchy(it, col, ast);
+		}
+	}
+
 	private void remapMethod(SimpleName node, IMethodBinding binding) {
 		ITypeBinding declaringClass = binding.getDeclaringClass();
 		if (GracefulCheck.checkGracefully(this.context, declaringClass)) {
@@ -71,13 +89,45 @@ class SimpleRemapperVisitor extends ASTVisitor {
 		if (binding.isConstructor()) {
 			updateIdentifier(node, classMapping.getSimpleDeobfuscatedName());
 		} else {
+			classMapping.complete(this.inheritanceProvider, declaringClass);
+
 			MethodSignature bindingSignature = convertSignature(binding);
 			MethodMapping mapping = findMemberMapping(bindingSignature, classMapping, ClassMapping::getMethodMapping);
 
 			if (mapping == null) {
-				classMapping.complete(this.inheritanceProvider, declaringClass);
 				mapping = classMapping.getMethodMapping(bindingSignature).orElse(null);
 			}
+
+			/* *********************
+			 * Begin Filigree Code *
+			 ********************* */
+
+			if (mapping == null) {
+				List<ITypeBinding> parents = new ArrayList<>();
+				ascendHierarchy(declaringClass, parents, context.createASTRewrite().getAST());
+
+				for (ITypeBinding parent: parents) {
+					final ClassMapping<?, ?> parentMapping = this.mappings.getClassMapping(parent.getBinaryName()).orElse(null);
+					if (parentMapping == null) { continue; }
+					IMethodBinding[] methods = parent.getDeclaredMethods();
+					for (int i = 0; i < methods.length; ++i) {
+						IMethodBinding method = methods[i];
+						if (binding.overrides(method)) {
+							IMethodBinding canonical = parent.getErasure().getDeclaredMethods()[i];
+
+							mapping = findMemberMapping(
+								convertSignature(canonical.getMethodDeclaration()),
+								parentMapping,
+								ClassMapping::getMethodMapping
+							);
+						}
+					}
+				}
+			}
+
+			/* *********************
+			 *  End Filigree Code  *
+			 ********************* */
 
 			if (mapping == null) {
 				return;

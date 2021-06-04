@@ -1,5 +1,6 @@
 package com.dimitriye.filigree
 
+import com.dimitriye.filigree.remapper.Remapper
 import org.apache.commons.cli.DefaultParser
 import org.apache.commons.cli.HelpFormatter
 import org.apache.commons.cli.Option
@@ -64,12 +65,12 @@ fun main(args: Array<String>) {
 	val moj = fetchAndCompileMojangMappings(version) // MOJ->OBF
 	val yarn = fetchAndCompileYarnMappings(version, yarnBuild) // OBF->YARN
 
-	val chain = cloneClasses(mcp).merge(cloneClasses(moj).reverse()).merge(moj).merge(yarn)
+	val chain = cloneClasses(mcp).filigreeMerge(cloneClasses(moj).reverse()).filigreeMerge(moj).filigreeMerge(yarn)
 
 	// Call mercury to do the heavy lifting
 	val mercury = Mercury()
 	mercury.classPath.addAll(classPaths)
-	mercury.processors.add(MercuryRemapper.create(chain))
+	mercury.processors.add(Remapper.create(chain))
 	mercury.rewrite(inputPath, outputPath)
 }
 

@@ -1,6 +1,7 @@
 @file:JvmName("Util")
 package com.dimitriye.filigree
 
+import com.dimitriye.filigree.model.MappingSetModelFactoryImpl
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import org.cadixdev.lorenz.MappingSet
@@ -65,4 +66,8 @@ fun cloneClasses(mappings: MappingSet, target: MappingSet = MappingSet.create())
 	}
 
 	return target
+}
+
+fun MappingSet.filigreeMerge(other: MappingSet): MappingSet {
+	return this.merge(other, MappingSet.create(MappingSetModelFactoryImpl()))
 }
