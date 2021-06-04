@@ -106,7 +106,7 @@ class SimpleRemapperVisitor extends ASTVisitor {
 				List<ITypeBinding> parents = new ArrayList<>();
 				ascendHierarchy(declaringClass, parents, context.createASTRewrite().getAST());
 
-				for (ITypeBinding parent: parents) {
+				PARENT_LOOP: for (ITypeBinding parent: parents) {
 					final ClassMapping<?, ?> parentMapping = this.mappings.getClassMapping(parent.getBinaryName()).orElse(null);
 					if (parentMapping == null) { continue; }
 					IMethodBinding[] methods = parent.getDeclaredMethods();
@@ -120,6 +120,8 @@ class SimpleRemapperVisitor extends ASTVisitor {
 								parentMapping,
 								ClassMapping::getMethodMapping
 							);
+
+							break PARENT_LOOP;
 						}
 					}
 				}
