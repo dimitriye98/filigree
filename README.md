@@ -40,7 +40,7 @@ task compileClasspath {
 and run `gradlew compileClasspath`
 
 ## Installation
-Build the project with
+Download the binaries from the GitHub releases or build the project with
 ```
 ./gradlew installDist
 ```
