@@ -12,6 +12,7 @@ usage: filigree [OPTION]... [SOURCE_DIRECTORY]
                          latest release
  -o,--output-dir <arg>   the output directory, defaults to
                          [SOURCE_DIRECTORY]_remapped
+ -v,--version            print version information
  -y,--yarn-build <arg>   the build of yarn to remap to, defaults to latest
 ```
 
