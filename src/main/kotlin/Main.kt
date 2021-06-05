@@ -36,7 +36,7 @@ fun main(args: Array<String>) {
 	}
 
 	// Read all options and incorporate sensible defaults
-	val version = cli.getOptionValue("version")
+	val version = cli.getOptionValue("mc-version")
 		?: latestVersions.release
 	val yarnBuild = cli.getOptionValue("yarn-build")
 		?: latestYarnBuild(version)
