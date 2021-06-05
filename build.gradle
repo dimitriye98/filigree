@@ -30,6 +30,12 @@ dependencies {
 	testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.0'
 }
 
+jar {
+	manifest {
+		attributes 'Implementation-Version': project.version
+	}
+}
+
 application {
 	mainClassName 'com.dimitriye.filigree.MainKt'
 }

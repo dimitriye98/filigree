@@ -6,20 +6,33 @@ import org.apache.commons.cli.HelpFormatter
 import org.apache.commons.cli.Option
 import org.apache.commons.cli.Options
 import org.cadixdev.mercury.Mercury
-import org.cadixdev.mercury.remapper.MercuryRemapper
 import java.io.File
+import java.lang.invoke.MethodHandles
 import java.nio.file.Path
 import kotlin.system.exitProcess
+
+fun printHelp(options: Options) {
+	val help = HelpFormatter()
+	help.printHelp("filigree [OPTION]... [SOURCE_DIRECTORY]", options)
+}
 
 fun main(args: Array<String>) {
 	val options = buildOptions()
 
 	// Display help message if called improperly
 	val cli = DefaultParser().parse(options, args, true)
-	if (cli.hasOption("help") || cli.args.size != 1) {
-		val help = HelpFormatter()
-		help.printHelp("filigree [OPTION]... [SOURCE_DIRECTORY]", options)
-		return
+	when {
+		cli.hasOption("help") -> {
+			return printHelp(options)
+		}
+		cli.hasOption("version") -> {
+			val version = MethodHandles.lookup().lookupClass().getPackage().implementationVersion
+			println("filigree version $version")
+			return
+		}
+		cli.args.size != 1 -> {
+			return printHelp(options)
+		}
 	}
 
 	// Read all options and incorporate sensible defaults
@@ -124,6 +137,12 @@ fun buildOptions(): Options {
 	Option.builder("h")
 		.longOpt("help")
 		.desc("display this message")
+		.build()
+		.let( options::addOption )
+
+	Option.builder("v")
+		.longOpt("version")
+		.desc("print version information")
 		.build()
 		.let( options::addOption )
 
